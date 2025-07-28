@@ -38,8 +38,9 @@ const UrlShorteningHome = () => {
 
   const handleUrlShorten = async (linkData) => {
     if (!user?.id) {
-      // For non-authenticated users, use localStorage fallback
-      const shortenedUrl = {
+      // For non-authenticated users, do not save or display recent links.
+      // Only allow short link creation, but don't persist history locally.
+      setCurrentShortenedUrl({
         id: Date.now(),
         original_url: linkData.originalUrl,
         short_code: linkData.shortCode || linkService.generateShortCode(),
@@ -49,14 +50,7 @@ const UrlShorteningHome = () => {
         qr_code_url: linkData.qrCodeUrl || null,
         created_at: new Date().toISOString(),
         clicks: 0
-      };
-      
-      setCurrentShortenedUrl(shortenedUrl);
-      
-      // Save to localStorage for demo
-      const savedLinks = JSON.parse(localStorage.getItem('linksnap_recent_links') || '[]');
-      const newLinks = [shortenedUrl, ...savedLinks].slice(0, 10);
-      localStorage.setItem('linksnap_recent_links', JSON.stringify(newLinks));
+      });
       return;
     }
 
@@ -95,11 +89,8 @@ const UrlShorteningHome = () => {
       // For authenticated users, this would require API call to delete links
       // For now, just clear local state
       setRecentLinks([]);
-    } else {
-      // For non-authenticated users, clear localStorage
-      localStorage.removeItem('linksnap_recent_links');
-      setRecentLinks([]);
-    }
+    } 
+    // Removed localStorage clearing for non-authenticated users
   };
 
   return (
