@@ -9,9 +9,12 @@ import CustomizationPanel from './components/CustomizationPanel';
 import DownloadPanel from './components/DownloadPanel';
 import QRGallery from './components/QRGallery';
 import BulkGenerator from './components/BulkGenerator';
+import { useAuth } from '../../contexts/AuthContext'; // Import useAuth
+import linkService from '../../utils/linkService'; // Import linkService
 
 const QRCodeGenerator = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // Get user from AuthContext
   const [selectedLink, setSelectedLink] = useState(null);
   const [qrCode, setQrCode] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -28,65 +31,35 @@ const QRCodeGenerator = () => {
     customHeight: '300'
   });
 
-  // Mock data for shortened links
-  const mockLinks = [
-    {
-      id: 'link1',
-      shortUrl: 'https://lnk.snap/abc123',
-      originalUrl: 'https://www.example.com/very-long-url-that-needs-shortening',
-      alias: 'example-page',
-      clicks: 245,
-      createdAt: new Date('2025-01-20'),
-      isActive: true
-    },
-    {
-      id: 'link2',
-      shortUrl: 'https://lnk.snap/xyz789',
-      originalUrl: 'https://docs.google.com/document/d/1234567890/edit',
-      alias: 'project-docs',
-      clicks: 89,
-      createdAt: new Date('2025-01-22'),
-      isActive: true
-    },
-    {
-      id: 'link3',
-      shortUrl: 'https://lnk.snap/def456',
-      originalUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
-      alias: 'tutorial-video',
-      clicks: 156,
-      createdAt: new Date('2025-01-25'),
-      isActive: true
-    },
-    {
-      id: 'link4',
-      shortUrl: 'https://lnk.snap/ghi789',
-      originalUrl: 'https://github.com/username/repository-name',
-      alias: 'github-repo',
-      clicks: 67,
-      createdAt: new Date('2025-01-26'),
-      isActive: true
-    }
-  ];
+  const [userLinks, setUserLinks] = useState([]); // State for user's shortened links
+  const [recentQRCodes, setRecentQRCodes] = useState([]); // State for user's QR codes
 
-  // Mock data for recent QR codes
-  const [recentQRCodes, setRecentQRCodes] = useState([
-    {
-      id: 'qr1',
-      shortUrl: 'https://lnk.snap/abc123',
-      originalUrl: 'https://www.example.com/very-long-url-that-needs-shortening',
-      qrCode: `<svg width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="white"/><rect x="10" y="10" width="10" height="10" fill="black"/><rect x="30" y="10" width="10" height="10" fill="black"/><rect x="50" y="10" width="10" height="10" fill="black"/><rect x="70" y="10" width="10" height="10" fill="black"/></svg>`,
-      format: 'png',
-      createdAt: new Date('2025-01-26')
-    },
-    {
-      id: 'qr2',
-      shortUrl: 'https://lnk.snap/xyz789',
-      originalUrl: 'https://docs.google.com/document/d/1234567890/edit',
-      qrCode: `<svg width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="white"/><rect x="20" y="20" width="10" height="10" fill="black"/><rect x="40" y="20" width="10" height="10" fill="black"/><rect x="60" y="20" width="10" height="10" fill="black"/></svg>`,
-      format: 'svg',
-      createdAt: new Date('2025-01-25')
-    }
-  ]);
+  // Load user's links and QR codes
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user?.id) {
+        setUserLinks([]);
+        setRecentQRCodes([]);
+        return;
+      }
+
+      // Fetch user's shortened links
+      try {
+        const result = await linkService.getUserLinks(user.id, 50); // Fetch more links for QR generation
+        if (result.success) {
+          setUserLinks(result.data || []);
+        }
+      } catch (error) {
+        console.error('Error loading user links for QR Generator:', error);
+      }
+
+      // TODO: Fetch user's QR codes from a dedicated QR service once implemented
+      // For now, clear mock data if user is logged in
+      setRecentQRCodes([]); 
+    };
+
+    loadUserData();
+  }, [user?.id]);
 
   // Generate QR code when link or settings change
   useEffect(() => {
@@ -179,17 +152,21 @@ const QRCodeGenerator = () => {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
       
-      // Add to recent QR codes
-      const newQR = {
-        id: `qr${Date.now()}`,
-        shortUrl: selectedLink.shortUrl,
-        originalUrl: selectedLink.originalUrl,
-        qrCode: qrCode,
-        format: downloadSettings.format,
-        createdAt: new Date()
-      };
-      
-      setRecentQRCodes(prev => [newQR, ...prev.slice(0, 9)]);
+      // Add to recent QR codes (only if user is logged in)
+      if (user?.id) {
+        const newQR = {
+          id: `qr${Date.now()}`,
+          shortUrl: selectedLink.shortUrl,
+          originalUrl: selectedLink.originalUrl,
+          qrCode: qrCode,
+          format: downloadSettings.format,
+          createdAt: new Date(),
+          user_id: user.id // Associate with user
+        };
+        
+        setRecentQRCodes(prev => [newQR, ...prev.slice(0, 9)]);
+        // TODO: Save QR code to database via a new QR service
+      }
       setIsDownloading(false);
     }, 2000);
   };
@@ -206,7 +183,7 @@ const QRCodeGenerator = () => {
   };
 
   const handleSelectQR = (qr) => {
-    const link = mockLinks.find(l => l.shortUrl === qr.shortUrl);
+    const link = userLinks.find(l => l.short_url === qr.shortUrl); // Use userLinks
     if (link) {
       setSelectedLink(link);
       setQrCode(qr.qrCode);
@@ -215,6 +192,7 @@ const QRCodeGenerator = () => {
 
   const handleDeleteQR = (qrId) => {
     setRecentQRCodes(prev => prev.filter(qr => qr.id !== qrId));
+    // TODO: Delete QR code from database via a new QR service
   };
 
   const handleDownloadQR = (qr) => {
@@ -273,7 +251,7 @@ const QRCodeGenerator = () => {
             {/* Left Column - Controls */}
             <div className="lg:col-span-1 space-y-6">
               <LinkSelector
-                links={mockLinks}
+                links={userLinks} // Use userLinks instead of mockLinks
                 selectedLink={selectedLink}
                 onLinkSelect={handleLinkSelect}
                 onCreateNew={handleCreateNewLink}
@@ -351,22 +329,24 @@ const QRCodeGenerator = () => {
           {showBulkMode && (
             <div className="mt-8">
               <BulkGenerator
-                links={mockLinks}
+                links={userLinks} // Use userLinks instead of mockLinks
                 onBulkGenerate={handleBulkGenerate}
                 isBulkGenerating={isBulkGenerating}
               />
             </div>
           )}
 
-          {/* Recent QR Codes Gallery */}
-          <div className="mt-8">
-            <QRGallery
-              recentQRCodes={recentQRCodes}
-              onSelectQR={handleSelectQR}
-              onDeleteQR={handleDeleteQR}
-              onDownloadQR={handleDownloadQR}
-            />
-          </div>
+          {/* Recent QR Codes Gallery - Only show for authenticated users with QR codes */}
+          {user?.id && recentQRCodes?.length > 0 && (
+            <div className="mt-8">
+              <QRGallery
+                recentQRCodes={recentQRCodes}
+                onSelectQR={handleSelectQR}
+                onDeleteQR={handleDeleteQR}
+                onDownloadQR={handleDownloadQR}
+              />
+            </div>
+          )}
 
           {/* Tips Section */}
           <div className="mt-8 bg-card rounded-xl border border-border p-6">
