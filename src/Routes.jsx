@@ -10,6 +10,7 @@ import QrCodeGenerator from "pages/qr-code-generator";
 import LinkManagementDashboard from "pages/link-management-dashboard";
 import PaymentFailed from "pages/payment-failed";
 import NotFound from "pages/NotFound";
+import RedirectPage from "pages/redirect-page";
 
 const Routes = () => {
   return (
@@ -22,6 +23,7 @@ const Routes = () => {
         <Route path="/user-login" element={<UserLogin />} />
         <Route path="/user-registration" element={<UserRegistration />} />
         <Route path="/url-shortening-home" element={<UrlShorteningHome />} />
+        <Route path="/:shortCode" element={<RedirectPage />} /> {/* New route for short links */}
         <Route path="/qr-code-generator" element={<QrCodeGenerator />} />
         <Route path="/link-management-dashboard" element={<LinkManagementDashboard />} />
         <Route path="/payment-failed" element={<PaymentFailed />} />
